@@ -1,26 +1,55 @@
-name: Build app and run UI tests
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-jobs:
-  build:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Run Selenium WebDriver UI Tests
-      run: dotnet test --no-build --verbosity normal
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+pipeline {
+    agent any
+    
+    triggers {
+        pollSCM('* * * * *')
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Verify .NET') {
+            steps {
+                sh 'dotnet --version || echo ".NET not found, will install in next stage"'
+            }
+        }
+        
+        stage('Setup .NET') {
+            when {
+                expression { 
+                    return sh(script: 'command -v dotnet', returnStatus: true) != 0 
+                }
+            }
+            steps {
+                sh '''
+                    wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+                    chmod +x dotnet-install.sh
+                    ./dotnet-install.sh --version 8.0.100
+                    export PATH="$HOME/.dotnet:$PATH"
+                '''
+            }
+        }
+        
+        stage('Restore dependencies') {
+            steps {
+                sh 'dotnet restore'
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'dotnet build --no-restore'
+            }
+        }
+        
+        stage('Run UI Tests') {
+            steps {
+                sh 'dotnet test --no-build --verbosity normal'
+            }
+        }
+    }
+}
